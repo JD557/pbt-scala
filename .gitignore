@@ -1,0 +1,14 @@
+*.pdf
+*~
+.DS_Store
+.bloop
+.dir-locals.el
+.ensime
+.ensime_cache
+.history
+.idea
+.idea_modules
+.lib
+.sbtrc
+.vagrant
+target/
