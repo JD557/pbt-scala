@@ -1,17 +1,8 @@
-package eu.joaocosta.pbt
+package eu.joaocosta.pbt.stateful
+
 import scala.collection.mutable
 
-object Helpers {
-  def lettersOnly(string: String): Boolean = {
-    val letters = ('a' to 'z').toSet
-    string.forall(c => letters.contains(c.toLower))
-  }
-
-  def lettersOnlyBug(string: String): Boolean = {
-    val letters = ('a' until 'z').toSet // Oops, this discards the 'z'!
-    string.forall(c => letters.contains(c.toLower))
-  }
-
+object Impls {
   trait MyHashMap[K, V] {
     def get(key: K): Option[V]
     def put(key: K, value: V): Unit
