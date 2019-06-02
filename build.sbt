@@ -11,6 +11,7 @@ resolvers += Resolver.url("bintray-scala-hedgehog",
 val hedgehogVersion = "d74f5bb31f26d3e3b7f7d0198b6e768a1ed20669"
 
 libraryDependencies ++= List(
+  //"org.scalacheck" %% "scalacheck" % "1.14.1-SNAPSHOT", // Applies https://github.com/rickynils/scalacheck/pull/468
   "org.scalacheck" %% "scalacheck" % "1.14.0",
 
   "hedgehog" %% "hedgehog-core" % hedgehogVersion,

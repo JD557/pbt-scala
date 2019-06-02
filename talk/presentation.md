@@ -1,6 +1,6 @@
 # Property Based Tests
 
-A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu) / [\@JD557](https://twitter.com/JD557)
+A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu) / [@JD557](https://twitter.com/JD557)
 
 ---
 
@@ -38,3 +38,192 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
   - Check the code coverage and branch coverage
 
 
+---
+
+## Testing Stateless Functions
+
+
+We want to test a function `f: A => B` that:
+
+- Is deterministic
+- Performs no side-effects
+- Doesn't access any global state 
+
+---
+
+### Example Problem
+
+We want to write a function `lettersOnly: String => Boolean` that returns `true` if the string contains only letters (`[a-zA-z]`), and `false` otherwise.
+
+---
+
+#### Naive approach
+
+We can write a test suite that:
+
+- Tests the base case:
+  ```scala
+  assert(fun("") == true)
+  ```
+- Tests known `true` cases
+  ```scala
+    assert(fun("aefioafsio") == true) // Lowercase
+    assert(fun("IHAU") == true) // Uppercase
+    assert(fun("ApBoSiA") == true) // Lowercase and Uppercase
+  ```
+- Tests known `false` cases
+  ```scala
+    assert(fun("0123") == false)
+    assert(fun("   ") == false)
+    assert(fun("01asd") == false)
+  ```
+
+---
+
+We then write an implementation:
+```scala
+  def lettersOnly(string: String): Boolean = {
+    val letters = ('a' until 'z').toSet
+    string.forall(c => letters.contains(c.toLower))
+  }
+
+```
+We then run the tests:
+- All tests pass
+- Code coverage: 100%
+- Branch coverage: 100%
+
+---
+
+This looks good, but our code is actually **WRONG**:
+```scala
+  def lettersOnly(string: String): Boolean = {
+    val letters = ('a' until 'z').toSet
+    string.forall(c => letters.contains(c.toLower))
+  }
+
+```
+Can you spot the error?
+How could we avoid this?
+
+---
+
+#### Problems with our approach
+
+- Tests only test a small sample of the total input space
+- Ideally, we would like to use write tests like:
+  - $\forall s\in[a \textrm{--} zA\textrm{--}z]^* \ldotp lettersOnly(s)$
+  - $\forall s\in[0 \textrm{--} 9]^+ \ldotp \neg{lettersOnly(s)}$
+  - ...
+- We could simply use random inputs in our tests
+  - `Error: lettersOnly("qudihidqhidqwhuidwqhidzuqhiwuhsdioa") is false`
+  - This helps, but it's hard to find out what's causing the bug
+
+---
+
+#### QuickCheck
+
+- Created in 1999 by Koen Claessen and John Hughes, in Haskell
+- Ported to multiple languages (e.g. ScalaCheck)
+- Two main concepts:
+  - `Gen[T]` - Generates an arbitrary value of type `T`
+  - `Shrinks[T]` - Given a value, attempts to generate a simpler value
+- For each property:
+  - Generate a random input `x: T` using `Gen[T]`
+  - If the test succeeds, repeat (N times)
+  - If the test fails, repeatedly shrink the input with `Shrink[T]` until it the test succeeds or it can't be shrunk anymore.
+
+---
+
+#### ScalaCheck notes
+
+ScalaCheck contains an extra type `Arbitrary`, which is simply a wrapper that store `Gen`s to be used in implicit searches.
+
+**Example**
+- `Arbitrary.arbitrary[String]: Gen[String]` - Default `String` generator
+- `Gen.alphaStr: Gen[String]` - Generates only `String`s in `[a-zA-Z]*`
+
+Also, the included generators are usually biased towards known edge cases (empty strings, 0,...)
+
+---
+
+#### QuickCheck approach
+
+We can write a test suite that:
+- Tests known `true` cases
+  ```scala
+    forAll(Gen.alphaLowerStr)(str => fun(str) == true).check()
+    forAll(Gen.alphaUpperStr)(str => fun(str) == true).check()
+    forAll(Gen.alphaStr)(str => fun(str) == true).check()
+  ```
+
+---
+
+- Tests known `false` cases
+  ```scala
+    // Create a new generator for strings with numbers
+    // (Possibly with letters)
+    val genMixedStr =
+      Gen.zip(
+        Gen.alphaStr, // Note that this can be empty
+        Gen.choose(0, 1000)).map { case (s, n) => s + n }
+    forAll(genMixedStr)(str => fun(str) == false).check()
+
+    // Creates a generator for whitespace strings
+    val genWhitespaceStr =
+      Gen.nonEmptyListOf(Gen.oneOf(' ', '\t', '\r', '\n', '\u0000'))
+        .map(_.mkString)
+    forAll(genWhitespaceStr)(str => fun(str) == false).check()
+
+  ```
+---
+
+- Write a `Shrink[String]` to shrink our examples:
+
+```scala
+  // Shrink our examples by removing one letter from the string
+  implicit lazy val shrinkString: Shrink[String] = Shrink { s =>
+    Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream
+  }
+```
+
+---
+
+**Test Results**
+
+```
+! Falsified after 6 passed tests.
+> ARG_0: "z"
+> ARG_0_ORIGINAL: "zucs"
+! Falsified after 11 passed tests.
+> ARG_0: "Z"
+> ARG_0_ORIGINAL: "ZUBH"
+! Falsified after 6 passed tests.
+> ARG_0: "z"
+> ARG_0_ORIGINAL: "Eivzh"
++ OK, passed 100 tests.
++ OK, passed 100 tests.
+```
+
+- `ARG_0_ORIGINAL`: Original tested value (e.g. `"Eivzh"`)
+- `ARG_0`: Shrunken value (e.g `"z"`)
+
+---
+
+It appears that `z` is an invalid input!
+
+```
+  def lettersOnly(string: String): Boolean = {
+    val letters = ('a' until 'z').toSet
+    string.forall(c => letters.contains(c.toLower))
+  }
+```
+
+Should actually be:
+
+```
+  def lettersOnly(string: String): Boolean = {
+    val letters = ('a' to 'z').toSet
+    string.forall(c => letters.contains(c.toLower))
+  }
+```
