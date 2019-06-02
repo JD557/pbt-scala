@@ -31,11 +31,11 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
 
 ### Typical Testing procedure
 
-  - Pick a unit of code to test
+ * Pick a unit of code to test
     - Mock dependencies (tested by other tests)
-  - Write a set of test cases with known results
+ * Write a set of test cases with known results
     - Make sure to test known edge cases (empty strings, zero,...)
-  - Check the code coverage and branch coverage
+ * Check the code coverage and branch coverage
 
 
 ---
@@ -45,9 +45,9 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
 
 We want to test a function `f: A => B` that:
 
-- Is deterministic
-- Performs no side-effects
-- Doesn't access any global state 
+ * Is deterministic
+ * Performs no side-effects
+ * Doesn't access any global state 
 
 ---
 
@@ -61,17 +61,17 @@ We want to write a function `lettersOnly: String => Boolean` that returns `true`
 
 We can write a test suite that:
 
-- Tests the base case:
+* Tests the base case:
   ```scala
   assert(fun("") == true)
   ```
-- Tests known `true` cases
+* Tests known `true` cases
   ```scala
     assert(fun("aefioafsio") == true) // Lowercase
     assert(fun("IHAU") == true) // Uppercase
     assert(fun("ApBoSiA") == true) // Lowercase and Uppercase
   ```
-- Tests known `false` cases
+* Tests known `false` cases
   ```scala
     assert(fun("0123") == false)
     assert(fun("   ") == false)
@@ -88,7 +88,8 @@ We then write an implementation:
   }
 
 ```
-We then run the tests:
+
+And run the tests:
 - All tests pass
 - Code coverage: 100%
 - Branch coverage: 100%
@@ -110,14 +111,14 @@ How could we avoid this?
 
 #### Problems with our approach
 
-- Tests only test a small sample of the total input space
-- Ideally, we would like to use write tests like:
-  - $\forall s\in[a \textrm{--} zA\textrm{--}z]^* \ldotp lettersOnly(s)$
-  - $\forall s\in[0 \textrm{--} 9]^+ \ldotp \neg{lettersOnly(s)}$
-  - ...
-- We could simply use random inputs in our tests
-  - `Error: lettersOnly("qudihidqhidqwhuidwqhidzuqhiwuhsdioa") is false`
-  - This helps, but it's hard to find out what's causing the bug
+ * Tests only test a small sample of the total input space
+ * Ideally, we would like to use write tests like:
+    - $\forall s\in[a \textrm{--} zA\textrm{--}z]^* \ldotp lettersOnly(s)$
+    - $\forall s\in[0 \textrm{--} 9]^+ \ldotp \neg{lettersOnly(s)}$
+    - ...
+ *  We could simply use random inputs in our tests
+    - `Error: lettersOnly("qudihidqhidqwhuidwqhidzuqhiwuhsdioa") is false`
+    - This helps, but it's hard to find out what's causing the bug
 
 ---
 
@@ -204,7 +205,7 @@ We can write a test suite that:
 
 It appears that `z` is an invalid input!
 
-```
+```scala
   def lettersOnly(string: String): Boolean = {
     val letters = ('a' until 'z').toSet
     string.forall(c => letters.contains(c.toLower))
@@ -213,7 +214,7 @@ It appears that `z` is an invalid input!
 
 Should actually be:
 
-```
+```scala
   def lettersOnly(string: String): Boolean = {
     val letters = ('a' to 'z').toSet
     string.forall(c => letters.contains(c.toLower))
@@ -237,11 +238,10 @@ Let's try it!
 ```
 
 Something went wrong...
- - `lettersOnly("\u0000") == false`, as expected.
- -  Our test was `forAll(Gen.alphaLowerStr)(str => fun(str) == true)`
-    - It failed the test because it used a string that is not an `alphaLowerStr`
-
-**The Shrinker has no knowledge of the generator, so it can generate invalid values!!!**
+ * `lettersOnly("\u0000") == false`, as expected.
+ *  Our test was `forAll(Gen.alphaLowerStr)(str => fun(str) == true)`
+    * It failed the test because it used a `String` that is not an `alphaLowerStr`
+ * **The Shrinker has no knowledge of the generator, so it can generate invalid values!!!**
 
 ---
 
