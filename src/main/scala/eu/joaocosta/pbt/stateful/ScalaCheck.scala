@@ -1,6 +1,6 @@
 package eu.joaocosta.pbt.stateful
 
-import scala.util.{Try, Success}
+import scala.util.{ Try, Success }
 
 import org.scalacheck._
 import org.scalacheck.Arbitrary._
@@ -16,9 +16,10 @@ object ScalaCheck extends App {
 
     // We can always create a new HashMap
     // This is useful if, for example, our SUT calls a running container
-    def canCreateNewSut(newState: State,
-                        initSuts: Traversable[State],
-                        runningSuts: Traversable[Sut]): Boolean = true
+    def canCreateNewSut(
+      newState: State,
+      initSuts: Traversable[State],
+      runningSuts: Traversable[Sut]): Boolean = true
 
     def initialPreCondition(state: State): Boolean = state.isEmpty
 
@@ -63,12 +64,11 @@ object ScalaCheck extends App {
       Gen.oneOf(
         Gen.alphaLowerStr.map(str => Get(str)),
         keyGen.map(str => Get(str)),
-        Gen.zip(Gen.alphaLowerStr, arbitrary[Int]).map{ case (k, v) => Put(k, v) },
-        Gen.zip(keyGen, arbitrary[Int]).map{ case (k, v) => Put(k, v) },
+        Gen.zip(Gen.alphaLowerStr, arbitrary[Int]).map { case (k, v) => Put(k, v) },
+        Gen.zip(keyGen, arbitrary[Int]).map { case (k, v) => Put(k, v) },
         Gen.alphaLowerStr.map(str => Delete(str)),
         keyGen.map(str => Delete(str)),
-        Gen.const(ToList)
-      )
+        Gen.const(ToList))
     }
   }
 

@@ -32,7 +32,7 @@ object Impls {
     def toList(): List[(K, V)] = buffer.flatten.toList
   }
 
-  class MyBuggyHashMap[K, V](capacity: Int = 128) extends MyHashMap[K, V]{
+  class MyBuggyHashMap[K, V](capacity: Int = 128) extends MyHashMap[K, V] {
     private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
     def get(key: K): Option[V] = {
       val pos = Math.floorMod(key.##, capacity)

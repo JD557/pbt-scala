@@ -21,11 +21,10 @@ object ScalaCheckDefaultShrink extends App {
     forAll(genNumStr)(str => fun(str) == false).check()
 
     // Create a new generator for mixed strings
-    val genMixedStr = 
+    val genMixedStr =
       Gen.zip(
         Gen.alphaChar.map(_.toString),
-        Gen.choose(0, 100).map(_.toString)
-      ).map { case (c, n) => c + n }
+        Gen.choose(0, 100).map(_.toString)).map { case (c, n) => c + n }
     forAll(genMixedStr)(str => fun(str) == false).check()
   }
 

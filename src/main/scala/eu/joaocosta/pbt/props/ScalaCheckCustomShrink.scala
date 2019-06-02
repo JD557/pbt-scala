@@ -10,7 +10,7 @@ object ScalaCheckCustomShrink extends App {
   // Shrink our examples by removing one letter from the string
   implicit lazy val shrinkString: Shrink[String] = Shrink { s =>
     //s.tails.toStream.reverse.filter(_ != s)
-    Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream 
+    Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream
   }
 
   // Note:
@@ -27,11 +27,10 @@ object ScalaCheckCustomShrink extends App {
     forAll(genNumStr)(str => fun(str) == false).check()
 
     // Create a new generator for mixed strings
-    val genMixedStr = 
+    val genMixedStr =
       Gen.zip(
         Gen.alphaChar.map(_.toString),
-        Gen.choose(0, 100).map(_.toString)
-      ).map { case (c, n) => c + n }
+        Gen.choose(0, 100).map(_.toString)).map { case (c, n) => c + n }
     forAll(genMixedStr)(str => fun(str) == false).check()
   }
 

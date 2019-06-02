@@ -9,24 +9,25 @@ object Hedgehog extends App {
 
   def test(fun: String => Boolean) {
 
-		def check(gen: GenT[String], expected: Boolean): Unit = {
-			println(Property.checkRandom(
-				PropertyConfig.default, gen.forAll.map(str => fun(str) ==== expected)
-			))
-		}
+    def check(gen: GenT[String], expected: Boolean): Unit = {
+      val result = Property.checkRandom(
+        PropertyConfig.default,
+        gen.forAll.map(str => fun(str) ==== expected))
+      println(result)
+    }
 
     // Manually define our generators
     val alphaLowerStr = Gen.string(Gen.lower, Range.linear(0, 10))
     val alphaUpperStr = Gen.string(Gen.upper, Range.linear(0, 10))
     val alphaStr = Gen.string(Gen.alpha, Range.linear(0, 10))
 
-		check(alphaLowerStr, true)
-		check(alphaUpperStr, true)
-		check(alphaStr, true)
+    check(alphaLowerStr, true)
+    check(alphaUpperStr, true)
+    check(alphaStr, true)
 
     // Create a new generator for numeric strings
     val numStr = Gen.string(Gen.digit, Range.linear(1, 10))
-		check(numStr, false)
+    check(numStr, false)
 
     // Create a new generator for mixed strings
     val genMixedStr: GenT[String] = for {

@@ -19,3 +19,4 @@ libraryDependencies ++= List(
 
   "org.typelevel" %% "discipline" % "0.11.0"
 )
+
