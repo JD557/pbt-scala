@@ -194,18 +194,10 @@ We can write a test suite that:
 ```
 ! Falsified after 6 passed tests.
 > ARG_0: "z"
-> ARG_0_ORIGINAL: "zucs"
-! Falsified after 11 passed tests.
-> ARG_0: "Z"
-> ARG_0_ORIGINAL: "ZUBH"
-! Falsified after 6 passed tests.
-> ARG_0: "z"
-> ARG_0_ORIGINAL: "Eivzh"
-+ OK, passed 100 tests.
-+ OK, passed 100 tests.
+> ARG_0_ORIGINAL: "eivzh"
 ```
 
-- `ARG_0_ORIGINAL`: Original tested value (e.g. `"Eivzh"`)
+- `ARG_0_ORIGINAL`: Original tested value (e.g. `"eivzh"`)
 - `ARG_0`: Shrunken value (e.g `"z"`)
 
 ---
@@ -227,3 +219,80 @@ Should actually be:
     string.forall(c => letters.contains(c.toLower))
   }
 ```
+
+---
+
+#### Shrinking
+
+We implemented our custom `Shrink[String]`, but ScalaCheck already comes with a default implementation.
+
+Let's try it!
+
+---
+
+```
+! Falsified after 4 passed tests.
+> ARG_0: "\u0000"
+> ARG_0_ORIGINAL: "ezg"
+```
+
+Something went wrong...
+ - `lettersOnly("\u0000") == false`, as expected.
+ -  Our test was `forAll(Gen.alphaLowerStr)(str => fun(str) == true)`
+    - It failed the test because it used a string that is not an `alphaLowerStr`
+
+**The Shrinker has no knowledge of the generator, so it can generate invalid values!!!**
+
+---
+
+#### Hedgehog
+
+- Alternative to QuickCheck
+- Created in 2017
+- `Shrink` is now part of `Gen`
+  - This solves our problem
+  - Creating a new `Gen` is slightly more cumbersome
+- Less supported than QuickCheck
+
+---
+
+#### Hedgehog implementation
+
+```scala
+    // Helper function to avoid the hedgehog-runtime boilerplate
+    def forAll(gen: GenT[String], expected: Boolean): Unit = ???
+
+    // Manually define our generators
+    val alphaLowerStr = Gen.string(Gen.lower, Range.linear(0, 10))
+    val alphaUpperStr = Gen.string(Gen.upper, Range.linear(0, 10))
+    val alphaStr = Gen.string(Gen.alpha, Range.linear(0, 10))
+
+    forAll(alphaLowerStr, true)
+    forAll(alphaUpperStr, true)
+    forAll(alphaStr, true)
+
+    // Create a new generator for numeric strings
+    val numStr = Gen.string(Gen.digit, Range.linear(1, 10))
+    forAll(numStr, false)
+
+    // Create a new generator for mixed strings
+    val genMixedStr: GenT[String] = for {
+      alpha <- alphaStr
+      num <- numStr
+    } yield alpha + num
+    forAll(genMixedStr, false)
+
+```
+
+---
+
+#### Tips
+
+- When a test fails, add it to your unit tests (can be a useful regression test)
+- Avoid the use of `Gen.filter`
+- Don't reimplement your logic
+  - Imagine if we did `Gen.listOf(('a' until 'z'))`
+  - Test properties using other unrelated methods
+    - e.g. `forAll { list: List[Int] => list.lastOption == list.reverse.headOption }`
+- You don't need to use property based tests everywhere
+  - e.g. "`foo` should parse a gzipped csv"
