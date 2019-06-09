@@ -136,9 +136,10 @@ How could we avoid this?
 
 ---
 
-#### ScalaCheck notes
+#### Arbitrary vs Gen
 
-ScalaCheck contains an extra type `Arbitrary`, which is simply a wrapper that store `Gen`s to be used in implicit searches.
+QuickCheck contains an extra type `Arbitrary`, which is simply a typeclass that store `Gen`s.
+In ScalaCheck, `Gen`s are explicit while `Arbitrary`s are used in implicit searches.
 
 **Example**
 - `Arbitrary.arbitrary[String]: Gen[String]` - Default `String` generator
@@ -148,14 +149,34 @@ Also, the included generators are usually biased towards known edge cases (empty
 
 ---
 
+#### Properties
+
+Our tests are now written as properties (`Prop`) of the form $\forall x \ldotp P(x)$
+
+**Example**
+  ```scala
+    forAll((x: Int) => prop(x)) // Using Arbitrary[Int]
+    forAll(Gen.alphaStr)(str => prop(str)) // Using a custom Gen[String]
+    forAll((x: Int, str: String) => prop(x, str)) // Using multiple arguments
+  ```
+
+Properties can be combined (`&&`, `||`, `==>`,...) or tested (`check()`)
+
+**Example**
+  ```scala
+    forAll((x: Int) => x != 0 ==> exists((y: Int) => prop(y / x))).check()
+  ```
+
+---
+
 #### QuickCheck approach
 
 We can write a test suite that:
 - Tests known `true` cases
   ```scala
-    forAll(Gen.alphaLowerStr)(str => fun(str) == true).check()
-    forAll(Gen.alphaUpperStr)(str => fun(str) == true).check()
-    forAll(Gen.alphaStr)(str => fun(str) == true).check()
+    forAll(Gen.alphaLowerStr)(str => lettersOnly(str) == true).check()
+    forAll(Gen.alphaUpperStr)(str => lettersOnly(str) == true).check()
+    forAll(Gen.alphaStr)(str => lettersOnly(str) == true).check()
   ```
 
 ---
@@ -168,13 +189,13 @@ We can write a test suite that:
       Gen.zip(
         Gen.alphaStr, // Note that this can be empty
         Gen.choose(0, 1000)).map { case (s, n) => s + n }
-    forAll(genMixedStr)(str => fun(str) == false).check()
+    forAll(genMixedStr)(str => lettersOnly(str) == false).check()
 
     // Creates a generator for whitespace strings
     val genWhitespaceStr =
       Gen.nonEmptyListOf(Gen.oneOf(' ', '\t', '\r', '\n', '\u0000'))
         .map(_.mkString)
-    forAll(genWhitespaceStr)(str => fun(str) == false).check()
+    forAll(genWhitespaceStr)(str => lettersOnly(str) == false).check()
 
   ```
 ---
@@ -296,3 +317,120 @@ Something went wrong...
     - e.g. `forAll { list: List[Int] => list.lastOption == list.reverse.headOption }`
 - You don't need to use property based tests everywhere
   - e.g. "`foo` should parse a gzipped csv"
+
+---
+
+## Testing Stateful System
+
+We want to test a system that:
+
+ * Is deterministic
+ * Can perform side-effects
+ * Has an internal state 
+
+ That is, our system can be (at least partially) modeled as a state machine
+ 
+---
+
+### Example Problem
+
+We want to write a simple Hash Map
+
+Supported operations:
+ - Get
+ - Put
+ - Delete
+ - ToList
+
+---
+
+#### Naive approach
+
+We can write a test suite that:
+
+- Creates a new HashMap
+```scala
+  val map = new HashMap[String, Int]()
+```
+
+- Checks that the map starts empty
+```scala
+    assert(map.toList.isEmpty == true)
+    assert(map.get("") == None)
+    assert(map.get("asd") == None)
+```
+
+---
+
+- Checks that insertions only insert the specified value
+```scala
+    map.put("asd", 1)
+    assert(map.get("") == None)
+    assert(map.get("asd") == Some(1))
+    assert(map.get("dsa") == None)
+    map.put("dsa", 2)
+    assert(map.get("") == None)
+    assert(map.get("asd") == Some(1))
+    assert(map.get("dsa") == Some(2))
+```
+
+---
+
+- Checks that updates only update the specified value
+```scala
+    map.put("asd", 3)
+    assert(map.get("") == None)
+    assert(map.get("asd") == Some(3))
+    assert(map.get("dsa") == Some(2))
+    assert(map.toList.sortBy(_._1) == List("asd" -> 3, "dsa" -> 2))
+```
+
+- Check that deletions remove the specified value
+```scala
+    map.delete("asd")
+    assert(map.get("asd") == None)
+    assert(map.get("dsa") == Some(2))
+```
+
+- Inspect the final state
+```scala
+    assert(map.toList.sortBy(_._1) == List("dsa" -> 2))
+```
+
+---
+
+We then write an implementation:
+```scala
+  class HashMap[K, V](capacity: Int = 128) {
+    private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
+
+    def get(key: K): Option[V] = {
+      val pos = Math.floorMod(key.##, capacity)
+      buffer(pos).find(_._1 == key).map(_._2)
+    }
+
+    def put(key: K, value: V): Unit = {
+      val pos = Math.floorMod(key.##, capacity)
+      val newList = (key, value) :: buffer(pos).filter(_._1 != key)
+      buffer(pos) = newList
+    }
+
+    def delete(key: K): Unit = {
+      val pos = Math.floorMod(key.##, capacity)
+      buffer(pos) = Nil
+    }
+
+    def toList(): List[(K, V)] = buffer.flatten.toList
+  }
+```
+
+---
+
+Again:
+- All tests pass
+- Code coverage: 100%
+- Branch coverage: 100%
+
+Also, again, our code is **WRONG**
+
+---
