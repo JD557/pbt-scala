@@ -434,3 +434,175 @@ Again:
 Also, again, our code is **WRONG**
 
 ---
+
+#### Problems with our approach
+
+ * Tests only a sequence of state transitions
+ * Ideally, we would like to test multiple sequences of state transitions
+
+---
+
+#### Stateful tests with QuickCheck
+
+- ScalaCheck provides a `Commands` API with:
+  - `Sut`: Mutable system under test
+  - `State`: Immutable state that models our `Sut` (usually a simpler model)
+  - `Command`: An operation to execute on our `Sut` that:
+    - Has a pre-condition
+    - Has a post-condition
+    - Performs a `State` transition
+
+---
+
+#### QuickCeck Approach
+
+We define our `State` and `Sut` and initial states:
+```scala
+type State = Map[String, Int]
+type Sut = HashMap[String, Int]
+
+// We can always create a new HashMap
+// This is useful if, for example, our SUT calls a running container
+def canCreateNewSut(
+  newState: State,
+  initSuts: Traversable[State],
+  runningSuts: Traversable[Sut]): Boolean = true
+
+def destroySut(sut: Sut): Unit = ()
+
+def genInitialState: Gen[State] = Gen.const(Map.empty)
+
+// Used to shrink the initial state
+def initialPreCondition(state: State): Boolean = state.isEmpty
+```
+
+---
+
+We define our Commands:
+```scala
+case class Get(key: String) extends Command {
+  type Result = Option[Int]
+  def run(sut: Sut): Result = sut.get(key)
+  def nextState(state: State): State = state
+  def preCondition(state: State): Boolean = true
+  def postCondition(state: State, result: Try[Result]): Prop = result == Success(state.get(key))
+}
+
+case class Put(key: String, value: Int) extends UnitCommand {
+  def run(sut: Sut): Unit = sut.put(key, value)
+  def nextState(state: State): State = state + (key -> value)
+  def preCondition(state: State): Boolean = true
+  def postCondition(state: State, success: Boolean): Prop = success
+}
+
+case class Delete(key: String) extends UnitCommand {
+  def run(sut: Sut): Result = sut.delete(key)
+  def nextState(state: State): State = state - key
+  def preCondition(state: State): Boolean = true
+  def postCondition(state: State, success: Boolean): Prop = success
+}
+
+case object ToList extends Command {
+  type Result = List[(String, Int)]
+  def run(sut: Sut): Result = sut.toList()
+  def nextState(state: State): State = state
+  def preCondition(state: State): Boolean = true
+  def postCondition(state: State, result: Try[Result]): Prop =
+    result.map(_.sortBy(_._1)) == Success(state.toList.sortBy(_._1))
+}
+```
+
+---
+
+We define our `Gen[Command]`:
+
+```scala
+def genCommand(state: State): Gen[Command] = {
+  // Generates a key that is present on the map
+  val keyGen = Gen.oneOf[String]("default_key" :: state.keys.toList)
+  Gen.oneOf(
+    Gen.alphaLowerStr.map(str => Get(str)),
+    keyGen.map(str => Get(str)),
+    Gen.zip(Gen.alphaLowerStr, arbitrary[Int]).map { case (k, v) => Put(k, v) },
+    Gen.zip(keyGen, arbitrary[Int]).map { case (k, v) => Put(k, v) },
+    Gen.alphaLowerStr.map(str => Delete(str)),
+    keyGen.map(str => Delete(str)),
+    Gen.const(ToList))
+}
+```
+---
+
+And finally, we run our tests:
+
+```
+! Falsified after 64 passed tests.
+> Labels of failing property:
+initialstate = Map()
+seqcmds = (Put(suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgtuxtluylwzhkinfm,0
+  ); Delete(default_key); ToList => List())
+> ARG_0: Actions(Map(),List(Put(suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgt
+  uxtluylwzhkinfm,0), Delete(default_key), ToList),List())
+> ARG_0_ORIGINAL: Actions(Map(),List(Get(cokxwqslowszddtkgncnlvclqdiuahsjzb
+  ukerkgyhibjifhncndzatxkjomc), Delete(default_key), Put(default_key,-21474
+  83648), Delete(ihmvdlplfwlckxiyutg), Get(yrylpvrjhaneqnmhnujyrvumtmxuilpu
+  cbeqjwddemmxjbioaxymoyvpebr), Get(ykjetehimcu), Put(default_key,-21474836
+  48), ToList, Get(mjylrfcfhhvghjvzrreifwqbydceuvpxuxqx), ToList, ToList, P
+  ut(suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgtuxtluylwzhkinfm,0), Get(pxp
+  oszdvqnkekigkkrtaxsmhywnrbxwkxtlncugtcknjrqhajbcmolxvupsfdz), Put(bxmquea
+  fgojulofqmynoey,-1957587762), Get(tleuphfwc), Delete(bxmqueafgojulofqmyno
+  ey), Get(default_key), Delete(default_key), ToList, Delete(default_key),
+  ToList, Delete(oplfxpgkekfyeutounmnayx), Get(suyqjkjeehbqtlaqnxazyatmzbnx
+  fjqvmkporafjpgtuxtluylwzhkinfm), Delete(suyqjkjeehbqtlaqnxazyatmzbnxfjqvm
+  kporafjpgtuxtluylwzhkinfm), Put(twjsvt,-1691763425), Put(twjsvt,117511834
+  3), Delete(wfcihiykssmeunkuyhwxwcdvfgyuijwgcadveoxxeqedkurrogfqmiisjiwdjp
+  je), Get(lrmfsyyylnmolhalgzajyonco), ToList, Put(nsumljqwsqa,-706203824),
+   Get(nsumljqwsqa), Put(yjtuzxjmseidjypombuyjolvtmquwqohpxqvzyckqllvrjlpxh
+  agmc,-1), Put(zmidlhfuptraspkvlydwxwnexfobbwjhdlcgsvpk,1), Put(zmidlhfupt
+  raspkvlydwxwnexfobbwjhdlcgsvpk,2147483647), Get(default_key), Delete(bnbj
+  nbdyqvcot), Get(twjsvt), Put(jyjsiozaaoxdcvecgcjupbgpmufqqjpgkxeoqrbgtwnq
+  ,-459846117), Put(fxklvxqvrvxmmaiiyimdoxcnlgwkxmdmoyoafiizbjmasxt,0), Del
+  ete(yjtuzxjmseidjypombuyjolvtmquwqohpxqvzyckqllvrjlpxhagmc), Delete(mxdhd
+  hcxgdkrnkpmatwcxlyejlcvypfdkcqelbomqsgumhbvjnpl), Get(default_key), Put(g
+  zmvbjkvlabvfoxac,2081989555), Get(fmujwqjwuoadrpwcxiebjaxkkzkbpvvqvjw), D
+  elete(rqnwjg), ToList, Delete(zqybwwzmdaqtuappuhon), Put(fxklvxqvrvxmmaii
+  yimdoxcnlgwkxmdmoyoafiizbjmasxt,-2147483648), Delete(wzgovsegmodtugwqdahg
+  piwfxswcwvnqrzrlnmsekfczeictkycflys), Delete(kmdisbyowaoqnrmurtbbhylwmrtk
+  hdkl), Get(ztjaikdqvzjuvgloyflunvunrzsqoehojzxxuptlyrzony), Delete(zmidlh
+  fuptraspkvlydwxwnexfobbwjhdlcgsvpk), Delete(cmksdudjpbiknumyhejatsobcnlcr
+  ldlvdhlif), Delete(fccbggmlakbnwxnwavwrw), ToList, Put(ritukulpo,1), Put(
+  fxklvxqvrvxmmaiiyimdoxcnlgwkxmdmoyoafiizbjmasxt,1), ToList, Put(ritukulpo
+  ,-700753175), Put(apqcnwqwywwnsuclkiloxgiuubhnf,-751821836), Put(wlewoygr
+  f,2147483647), Get(gzmvbjkvlabvfoxac), Get(twjsvt), Put(jyjsiozaaoxdcvecg
+  cjupbgpmufqqjpgkxeoqrbgtwnq,1)),List())
+```
+
+---
+
+- Those are a lot of commands... Let's look at the shrinked result
+  * `Put(suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgtuxtluylwzhkinfm,0)`
+  * `Delete(default_key)`
+  * `ToList` => `List()`
+
+* Wow, what happened here?
+  * `Delete(default_key)` also deleted `suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgtuxtluylwzhkinfm`
+  * `hash(default_key) == hash(suyqjkjeehbqtlaqnxazyatmzbnxfjqvmkporafjpgtuxtluylwzhkinfm)`
+  * Our delete fails when there's an hash collision!
+
+---
+
+```scala
+def delete(key: K): Unit = {
+  val pos = Math.floorMod(key.##, capacity)
+  buffer(pos) = Nil
+}
+```
+
+should be
+
+```scala
+def delete(key: K): Unit = {
+  val pos = Math.floorMod(key.##, capacity)
+  val newList = buffer(pos).filter(_._1 != key)
+  buffer(pos) = newList
+}
+```
