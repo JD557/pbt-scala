@@ -606,3 +606,26 @@ def delete(key: K): Unit = {
   buffer(pos) = newList
 }
 ```
+
+---
+
+#### Tips
+
+- Your model should be a simpler version of your system
+- Give some love to `genCommand`
+  - e.g. use `Gen.frequency` to test interesting command sequences
+
+---
+
+## Some extra notes
+
+- [scalacheck-shapeless](https://github.com/alexarchambault/scalacheck-shapeless): Reduce the boilerplate necessary to generate case classes
+- [discipline](https://github.com/typelevel/discipline): Helper library for typeclass hierarchy laws
+  - Used by most libraries with huge typeclass hierarchies (cats, spire, scalaz...)
+  - Useful test typeclass instances "for free" (e.g. `checkAll("MovieRating", spire.laws.GroupLaws[MovieRating].cMonoid)`)
+- Shrinking commands is currently not working with scala 2.12 [scalacheck/#468](https://github.com/rickynils/scalacheck/pull/468)
+- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/rickynils/scalacheck/pull/468)
+
+---
+
+## Questions
