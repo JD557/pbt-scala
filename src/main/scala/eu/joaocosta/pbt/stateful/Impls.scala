@@ -10,6 +10,13 @@ object Impls {
     def toList(): List[(K, V)]
   }
 
+  class MyMockHashMap[K, V]() extends MyHashMap[K, V] {
+    def get(key: K): Option[V] = None
+    def put(key: K, value: V): Unit = ()
+    def delete(key: K): Unit = ()
+    def toList(): List[(K, V)] = Nil
+  }
+
   class MyNaiveHashMap[K, V](capacity: Int = 128) extends MyHashMap[K, V] {
     private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
     def get(key: K): Option[V] = {

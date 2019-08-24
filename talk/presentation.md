@@ -29,19 +29,21 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
 
 ---
 
-### Typical Testing procedure
+### Typical Testing Procedure
 
- * Pick a unit of code to test
-    - Mock dependencies (tested by other tests)
+ * Pick a small unit of code to implement
  * Write a set of test cases with known results
     - Make sure to test known edge cases (empty strings, zero,...)
- * Check the code coverage and branch coverage
-
+    - Use mock dependencies (those are tested by other tests)
+ * Check that the test fails if the feature is not implemented
+ * Implement the feature
+ * Run the tests
+   - They should succeed
+   - Check the code coverage and branch coverage
 
 ---
 
 ## Testing Stateless Functions
-
 
 We want to test a function `f: A => B` that:
 
@@ -53,34 +55,47 @@ We want to test a function `f: A => B` that:
 
 ### Example Problem
 
-We want to write a function `lettersOnly: String => Boolean` that returns `true` if the string contains only letters (`[a-zA-z]`), and `false` otherwise.
+Implement `lettersOnly: String => Boolean`
+ - Returns `true` if the string contains only letters (`[a-zA-z]`)
+ - Returns`false` otherwise
 
 ---
 
 #### Naive approach
 
-We can write a test suite that:
+##### Write a set of test cases with known results
 
-* Tests the base case:
+* Test the base case:
   ```scala
-  assert(fun("") == true)
+  assert(lettersOnly("") == true)
   ```
-* Tests known `true` cases
+* Test known `true` cases
   ```scala
-    assert(fun("aefioafsio") == true) // Lowercase
-    assert(fun("IHAU") == true) // Uppercase
-    assert(fun("ApBoSiA") == true) // Lowercase and Uppercase
+    assert(lettersOnly("aefioafsio") == true) // Lowercase
+    assert(lettersOnly("IHAU") == true) // Uppercase
+    assert(lettersOnly("ApBoSiA") == true) // Lowercase and Uppercase
   ```
-* Tests known `false` cases
+* Test known `false` cases
   ```scala
-    assert(fun("0123") == false)
-    assert(fun("   ") == false)
-    assert(fun("01asd") == false)
+    assert(lettersOnly("0123") == false)
+    assert(lettersOnly("   ") == false)
+    assert(lettersOnly("01asd") == false)
   ```
 
 ---
 
-We then write an implementation:
+##### Check that the test fails if the feature is not implemented
+
+```
+  def lettersOnly(string: String): Boolean = false
+```
+
+Tests fail `assert(lettersOnly("") == true)`
+
+---
+
+##### Implement the feature
+
 ```scala
   def lettersOnly(string: String): Boolean = {
     val letters = ('a' until 'z').toSet
@@ -88,8 +103,10 @@ We then write an implementation:
   }
 
 ```
+---
 
-And run the tests:
+##### Run the tests
+
 - All tests pass
 - Code coverage: 100%
 - Branch coverage: 100%
@@ -271,6 +288,7 @@ Something went wrong...
 - Alternative to QuickCheck
 - Created in 2017
 - `Shrink` is now part of `Gen`
+    - Instead of generating values, `Gen` generates a `Tree[A](value: A, children: LazyList[Tree[A]])` internally
   - This solves our problem
   - Creating a new `Gen` is slightly more cumbersome
 - Less supported than QuickCheck
@@ -320,40 +338,41 @@ Something went wrong...
 
 ---
 
-## Testing Stateful System
+## Testing Stateful Systems
 
 We want to test a system that:
 
  * Is deterministic
  * Can perform side-effects
  * Has an internal state 
-
- That is, our system can be (at least partially) modeled as a state machine
  
 ---
 
 ### Example Problem
 
-We want to write a simple Hash Map
+We want to write a simple mutable Hash Map
 
-Supported operations:
- - Get
- - Put
- - Delete
- - ToList
+```scala
+  class HashMap[K, V](???) {
+    def get(key: K): Option[V] = ???
+    def put(key: K, value: V): Unit = ???
+    def delete(key: K): Unit = ???
+    def toList(): List[(K, V)] = ???
+}
+```
 
 ---
 
 #### Naive approach
 
-We can write a test suite that:
+##### Write a set of test cases with known results
 
-- Creates a new HashMap
+- Create a new HashMap
 ```scala
   val map = new HashMap[String, Int]()
 ```
 
-- Checks that the map starts empty
+- Check that the map starts empty
 ```scala
     assert(map.toList.isEmpty == true)
     assert(map.get("") == None)
@@ -362,7 +381,7 @@ We can write a test suite that:
 
 ---
 
-- Checks that insertions only insert the specified value
+- Check that insertions only insert the specified value
 ```scala
     map.put("asd", 1)
     assert(map.get("") == None)
@@ -376,7 +395,7 @@ We can write a test suite that:
 
 ---
 
-- Checks that updates only update the specified value
+- Check that updates only update the specified value
 ```scala
     map.put("asd", 3)
     assert(map.get("") == None)
@@ -399,7 +418,23 @@ We can write a test suite that:
 
 ---
 
-We then write an implementation:
+##### Check that the test fails if the feature is not implemented
+
+```scala
+  class HashMap[K, V]() {
+    def get(key: K): Option[V] = None
+    def put(key: K, value: V): Unit = ()
+    def delete(key: K): Unit = ()
+    def toList(): List[(K, V)] = Nil
+}
+```
+
+Fails on `assert(map.get("asd") == Some(1))`
+
+---
+
+##### Implement the feature
+
 ```scala
   class HashMap[K, V](capacity: Int = 128) {
     private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
@@ -426,12 +461,13 @@ We then write an implementation:
 
 ---
 
-Again:
+##### Run the tests
+
 - All tests pass
 - Code coverage: 100%
 - Branch coverage: 100%
 
-Also, again, our code is **WRONG**
+However, again, our code is **WRONG**!
 
 ---
 
@@ -617,14 +653,24 @@ def delete(key: K): Unit = {
 
 ---
 
-## Some extra notes
+## Regarding ScalaCheck problems
+
+- Shrinking commands is currently not working with scala 2.12 [scalacheck/#468](https://github.com/typelevel/scalacheck/pull/468)
+- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/typelevel/scalacheck/pull/468)
+- ScalaCheck has recently moved to Typelevel
+
+---
+
+## Some other projects
 
 - [scalacheck-shapeless](https://github.com/alexarchambault/scalacheck-shapeless): Reduce the boilerplate necessary to generate case classes
 - [discipline](https://github.com/typelevel/discipline): Helper library for typeclass hierarchy laws
   - Used by most libraries with huge typeclass hierarchies (cats, spire, scalaz...)
   - Useful test typeclass instances "for free" (e.g. `checkAll("MovieRating", spire.laws.GroupLaws[MovieRating].cMonoid)`)
-- Shrinking commands is currently not working with scala 2.12 [scalacheck/#468](https://github.com/rickynils/scalacheck/pull/468)
-- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/rickynils/scalacheck/pull/468)
+- [zio-test](https://github.com/zio/zio)
+  - Has the concept of `Sample[-R, +A](value: A, shrink: ZStream[R, Nothing, Sample[R, A]])`, which is a value and a stream that generates shrinked values
+  - A `Gen[-R, +A]` is simply a stream of `Sample`s, so generation and shrinking also get coupled
+  - Still experimental
 
 ---
 
