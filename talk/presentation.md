@@ -1,3 +1,7 @@
+---
+paginate: true
+---
+
 # Property Based Tests
 
 A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu) / [@JD557](https://twitter.com/JD557)
@@ -33,13 +37,12 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
 
  * Pick a small unit of code to implement
  * Write a set of test cases with known results
-    - Make sure to test known edge cases (empty strings, zero,...)
+    - Test known edge cases (empty strings, zero,...)
     - Use mock dependencies (those are tested by other tests)
- * Check that the test fails if the feature is not implemented
+ * Check that the tests fail
  * Implement the feature
  * Run the tests
-   - They should succeed
-   - Check the code coverage and branch coverage
+   - Also, check the code/branch coverage
 
 ---
 
@@ -71,23 +74,23 @@ Implement `lettersOnly: String => Boolean`
   ```
 * Test known `true` cases
   ```scala
-    assert(lettersOnly("aefioafsio") == true) // Lowercase
-    assert(lettersOnly("IHAU") == true) // Uppercase
-    assert(lettersOnly("ApBoSiA") == true) // Lowercase and Uppercase
+  assert(lettersOnly("aefioafsio") == true) // Lowercase
+  assert(lettersOnly("IHAU") == true) // Uppercase
+  assert(lettersOnly("ApBoSiA") == true) // Lowercase and Uppercase
   ```
 * Test known `false` cases
   ```scala
-    assert(lettersOnly("0123") == false)
-    assert(lettersOnly("   ") == false)
-    assert(lettersOnly("01asd") == false)
+  assert(lettersOnly("0123") == false)
+  assert(lettersOnly("   ") == false)
+  assert(lettersOnly("01asd") == false)
   ```
 
 ---
 
-##### Check that the test fails if the feature is not implemented
+##### Check that the tests fail
 
-```
-  def lettersOnly(string: String): Boolean = false
+```scala
+def lettersOnly(string: String): Boolean = false
 ```
 
 Tests fail `assert(lettersOnly("") == true)`
@@ -97,11 +100,10 @@ Tests fail `assert(lettersOnly("") == true)`
 ##### Implement the feature
 
 ```scala
-  def lettersOnly(string: String): Boolean = {
-    val letters = ('a' until 'z').toSet
-    string.forall(c => letters.contains(c.toLower))
-  }
-
+def lettersOnly(string: String): Boolean = {
+  val letters = ('a' until 'z').toSet
+  string.forall(c => letters.contains(c.toLower))
+}
 ```
 ---
 
@@ -114,13 +116,14 @@ Tests fail `assert(lettersOnly("") == true)`
 ---
 
 This looks good, but our code is actually **WRONG**:
-```scala
-  def lettersOnly(string: String): Boolean = {
-    val letters = ('a' until 'z').toSet
-    string.forall(c => letters.contains(c.toLower))
-  }
 
+```scala
+def lettersOnly(string: String): Boolean = {
+  val letters = ('a' until 'z').toSet
+  string.forall(c => letters.contains(c.toLower))
+}
 ```
+
 Can you spot the error?
 How could we avoid this?
 
@@ -129,12 +132,12 @@ How could we avoid this?
 #### Problems with our approach
 
  * Tests only test a small sample of the total input space
- * Ideally, we would like to use write tests like:
+ * Ideally, we would like to test the whole input space
     - $\forall s\in[a \textrm{--} zA\textrm{--}z]^* \ldotp lettersOnly(s)$
     - $\forall s\in[0 \textrm{--} 9]^+ \ldotp \neg{lettersOnly(s)}$
     - ...
- *  We could simply use random inputs in our tests
-    - `Error: lettersOnly("qudihidqhidqwhuidwqhidzuqhiwuhsdioa") is false`
+ * Possible Solution: Use random inputs
+    - `Error: lettersOnly("qudwhdwqhizuqhidioa") is false`
     - This helps, but it's hard to find out what's causing the bug
 
 ---
@@ -148,21 +151,21 @@ How could we avoid this?
   - `Shrinks[T]` - Given a value, attempts to generate a simpler value
 - For each property:
   - Generate a random input `x: T` using `Gen[T]`
-  - If the test succeeds, repeat (N times)
+  - If the test succeeds, test again with another `x` (N times)
   - If the test fails, repeatedly shrink the input with `Shrink[T]` until it the test succeeds or it can't be shrunk anymore.
 
 ---
 
 #### Arbitrary vs Gen
 
-QuickCheck contains an extra type `Arbitrary`, which is simply a typeclass that store `Gen`s.
-In ScalaCheck, `Gen`s are explicit while `Arbitrary`s are used in implicit searches.
+- QuickCheck contains an extra typeclass `Arbitrary[T](arbitrary: Gen[T])`
+- In ScalaCheck, `Gen`s are explicit while `Arbitrary`s are used in implicit searches.
 
 **Example**
 - `Arbitrary.arbitrary[String]: Gen[String]` - Default `String` generator
 - `Gen.alphaStr: Gen[String]` - Generates only `String`s in `[a-zA-Z]*`
 
-Also, the included generators are usually biased towards known edge cases (empty strings, 0,...)
+The included generators are also biased towards known edge cases (empty strings, 0,...)
 
 ---
 
@@ -172,58 +175,57 @@ Our tests are now written as properties (`Prop`) of the form $\forall x \ldotp P
 
 **Example**
   ```scala
-    forAll((x: Int) => prop(x)) // Using Arbitrary[Int]
-    forAll(Gen.alphaStr)(str => prop(str)) // Using a custom Gen[String]
-    forAll((x: Int, str: String) => prop(x, str)) // Using multiple arguments
+  forAll((x: Int) => prop(x)) // Using Arbitrary[Int]
+  forAll(Gen.alphaStr)(str => prop(str)) // Using a custom Gen[String]
+  forAll((x: Int, str: String) => prop(x, str)) // Using multiple arguments
   ```
 
 Properties can be combined (`&&`, `||`, `==>`,...) or tested (`check()`)
 
 **Example**
   ```scala
-    forAll((x: Int) => x != 0 ==> exists((y: Int) => prop(y / x))).check()
+  forAll((x: Int) => x != 0 ==> exists((y: Int) => prop(y / x))).check()
   ```
 
 ---
 
 #### QuickCheck approach
 
-We can write a test suite that:
+Our new test suite:
 - Tests known `true` cases
   ```scala
-    forAll(Gen.alphaLowerStr)(str => lettersOnly(str) == true).check()
-    forAll(Gen.alphaUpperStr)(str => lettersOnly(str) == true).check()
-    forAll(Gen.alphaStr)(str => lettersOnly(str) == true).check()
+  forAll(Gen.alphaLowerStr)(str => lettersOnly(str) == true).check()
+  forAll(Gen.alphaUpperStr)(str => lettersOnly(str) == true).check()
+  forAll(Gen.alphaStr)(str => lettersOnly(str) == true).check()
   ```
 
 ---
 
 - Tests known `false` cases
   ```scala
-    // Create a new generator for strings with numbers
-    // (Possibly with letters)
-    val genMixedStr =
-      Gen.zip(
-        Gen.alphaStr, // Note that this can be empty
-        Gen.choose(0, 1000)).map { case (s, n) => s + n }
-    forAll(genMixedStr)(str => lettersOnly(str) == false).check()
+  // Create a new generator for strings with numbers
+  // (Possibly with letters)
+  val genMixedStr =
+    Gen.zip(
+      Gen.alphaStr, // Note that this can be empty
+      Gen.choose(0, 1000)).map { case (s, n) => s + n }
+  forAll(genMixedStr)(str => lettersOnly(str) == false).check()
 
-    // Creates a generator for whitespace strings
-    val genWhitespaceStr =
-      Gen.nonEmptyListOf(Gen.oneOf(' ', '\t', '\r', '\n', '\u0000'))
-        .map(_.mkString)
-    forAll(genWhitespaceStr)(str => lettersOnly(str) == false).check()
-
+  // Creates a generator for whitespace strings
+  val genWhitespaceStr =
+    Gen.nonEmptyListOf(Gen.oneOf(' ', '\t', '\r', '\n', '\u0000'))
+      .map(_.mkString)
+  forAll(genWhitespaceStr)(str => lettersOnly(str) == false).check()
   ```
 ---
 
-- Write a `Shrink[String]` to shrink our examples:
+We should also add a `Shrink[String]` to shrink our examples:
 
 ```scala
-  // Shrink our examples by removing one letter from the string
-  implicit lazy val shrinkString: Shrink[String] = Shrink { s =>
-    Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream
-  }
+// Shrink our examples by removing one letter from the string
+implicit lazy val shrinkString: Shrink[String] = Shrink { s =>
+  Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream
+}
 ```
 
 ---
@@ -244,19 +246,19 @@ We can write a test suite that:
 It appears that `z` is an invalid input!
 
 ```scala
-  def lettersOnly(string: String): Boolean = {
-    val letters = ('a' until 'z').toSet
-    string.forall(c => letters.contains(c.toLower))
-  }
+def lettersOnly(string: String): Boolean = {
+  val letters = ('a' until 'z').toSet
+  string.forall(c => letters.contains(c.toLower))
+}
 ```
 
 Should actually be:
 
 ```scala
-  def lettersOnly(string: String): Boolean = {
-    val letters = ('a' to 'z').toSet
-    string.forall(c => letters.contains(c.toLower))
-  }
+def lettersOnly(string: String): Boolean = {
+  val letters = ('a' to 'z').toSet
+  string.forall(c => letters.contains(c.toLower))
+}
 ```
 
 ---
@@ -269,17 +271,18 @@ Let's try it!
 
 ---
 
+Result with the default shrinker:
 ```
 ! Falsified after 4 passed tests.
 > ARG_0: "\u0000"
 > ARG_0_ORIGINAL: "ezg"
 ```
 
-Something went wrong...
- * `lettersOnly("\u0000") == false`, as expected.
- *  Our test was `forAll(Gen.alphaLowerStr)(str => fun(str) == true)`
-    * It failed the test because it used a `String` that is not an `alphaLowerStr`
- * **The Shrinker has no knowledge of the generator, so it can generate invalid values!!!**
+* Something went wrong...
+   * `lettersOnly("\u0000") == false`, as expected.
+   *  Our test was `forAll(Gen.alphaLowerStr)(str => lettersOnly(str) == true)`
+      * It failed the test because it used a `String` that is not an `alphaLowerStr`
+   * **The Shrinker has no knowledge of the generator, so it can generate invalid values!!!**
 
 ---
 
@@ -298,29 +301,28 @@ Something went wrong...
 #### Hedgehog implementation
 
 ```scala
-    // Helper function to avoid the hedgehog-runtime boilerplate
-    def forAll(gen: GenT[String], expected: Boolean): Unit = ???
+// Helper function to avoid the hedgehog-runtime boilerplate
+def forAll(gen: GenT[String], expected: Boolean): Unit = ???
 
-    // Manually define our generators
-    val alphaLowerStr = Gen.string(Gen.lower, Range.linear(0, 10))
-    val alphaUpperStr = Gen.string(Gen.upper, Range.linear(0, 10))
-    val alphaStr = Gen.string(Gen.alpha, Range.linear(0, 10))
+// Manually define our generators
+val alphaLowerStr = Gen.string(Gen.lower, Range.linear(0, 10))
+val alphaUpperStr = Gen.string(Gen.upper, Range.linear(0, 10))
+val alphaStr = Gen.string(Gen.alpha, Range.linear(0, 10))
 
-    forAll(alphaLowerStr, true)
-    forAll(alphaUpperStr, true)
-    forAll(alphaStr, true)
+forAll(alphaLowerStr, true)
+forAll(alphaUpperStr, true)
+forAll(alphaStr, true)
 
-    // Create a new generator for numeric strings
-    val numStr = Gen.string(Gen.digit, Range.linear(1, 10))
-    forAll(numStr, false)
+// Create a new generator for numeric strings
+val numStr = Gen.string(Gen.digit, Range.linear(1, 10))
+forAll(numStr, false)
 
-    // Create a new generator for mixed strings
-    val genMixedStr: GenT[String] = for {
-      alpha <- alphaStr
-      num <- numStr
-    } yield alpha + num
-    forAll(genMixedStr, false)
-
+// Create a new generator for mixed strings
+val genMixedStr: GenT[String] = for {
+  alpha <- alphaStr
+  num <- numStr
+} yield alpha + num
+forAll(genMixedStr, false)
 ```
 
 ---
@@ -353,11 +355,11 @@ We want to test a system that:
 We want to write a simple mutable Hash Map
 
 ```scala
-  class HashMap[K, V](???) {
-    def get(key: K): Option[V] = ???
-    def put(key: K, value: V): Unit = ???
-    def delete(key: K): Unit = ???
-    def toList(): List[(K, V)] = ???
+class HashMap[K, V](???) {
+  def get(key: K): Option[V] = ???
+  def put(key: K, value: V): Unit = ???
+  def delete(key: K): Unit = ???
+  def toList(): List[(K, V)] = ???
 }
 ```
 
@@ -369,63 +371,63 @@ We want to write a simple mutable Hash Map
 
 - Create a new HashMap
 ```scala
-  val map = new HashMap[String, Int]()
+val map = new HashMap[String, Int]()
 ```
 
 - Check that the map starts empty
 ```scala
-    assert(map.toList.isEmpty == true)
-    assert(map.get("") == None)
-    assert(map.get("asd") == None)
+assert(map.toList.isEmpty == true)
+assert(map.get("") == None)
+assert(map.get("asd") == None)
 ```
 
 ---
 
 - Check that insertions only insert the specified value
 ```scala
-    map.put("asd", 1)
-    assert(map.get("") == None)
-    assert(map.get("asd") == Some(1))
-    assert(map.get("dsa") == None)
-    map.put("dsa", 2)
-    assert(map.get("") == None)
-    assert(map.get("asd") == Some(1))
-    assert(map.get("dsa") == Some(2))
+map.put("asd", 1)
+assert(map.get("") == None)
+assert(map.get("asd") == Some(1))
+assert(map.get("dsa") == None)
+map.put("dsa", 2)
+assert(map.get("") == None)
+assert(map.get("asd") == Some(1))
+assert(map.get("dsa") == Some(2))
 ```
 
 ---
 
 - Check that updates only update the specified value
 ```scala
-    map.put("asd", 3)
-    assert(map.get("") == None)
-    assert(map.get("asd") == Some(3))
-    assert(map.get("dsa") == Some(2))
-    assert(map.toList.sortBy(_._1) == List("asd" -> 3, "dsa" -> 2))
+map.put("asd", 3)
+assert(map.get("") == None)
+assert(map.get("asd") == Some(3))
+assert(map.get("dsa") == Some(2))
+assert(map.toList.sortBy(_._1) == List("asd" -> 3, "dsa" -> 2))
 ```
 
 - Check that deletions remove the specified value
 ```scala
-    map.delete("asd")
-    assert(map.get("asd") == None)
-    assert(map.get("dsa") == Some(2))
+map.delete("asd")
+assert(map.get("asd") == None)
+assert(map.get("dsa") == Some(2))
 ```
 
 - Inspect the final state
 ```scala
-    assert(map.toList.sortBy(_._1) == List("dsa" -> 2))
+assert(map.toList.sortBy(_._1) == List("dsa" -> 2))
 ```
 
 ---
 
-##### Check that the test fails if the feature is not implemented
+##### Check that the tests fail
 
 ```scala
-  class HashMap[K, V]() {
-    def get(key: K): Option[V] = None
-    def put(key: K, value: V): Unit = ()
-    def delete(key: K): Unit = ()
-    def toList(): List[(K, V)] = Nil
+class HashMap[K, V]() {
+  def get(key: K): Option[V] = None
+  def put(key: K, value: V): Unit = ()
+  def delete(key: K): Unit = ()
+  def toList(): List[(K, V)] = Nil
 }
 ```
 
@@ -436,27 +438,27 @@ Fails on `assert(map.get("asd") == Some(1))`
 ##### Implement the feature
 
 ```scala
-  class HashMap[K, V](capacity: Int = 128) {
-    private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
+class HashMap[K, V](capacity: Int = 128) {
+  private val buffer: mutable.ArrayBuffer[List[(K, V)]] = mutable.ArrayBuffer.fill(capacity)(List.empty)
 
-    def get(key: K): Option[V] = {
-      val pos = Math.floorMod(key.##, capacity)
-      buffer(pos).find(_._1 == key).map(_._2)
-    }
-
-    def put(key: K, value: V): Unit = {
-      val pos = Math.floorMod(key.##, capacity)
-      val newList = (key, value) :: buffer(pos).filter(_._1 != key)
-      buffer(pos) = newList
-    }
-
-    def delete(key: K): Unit = {
-      val pos = Math.floorMod(key.##, capacity)
-      buffer(pos) = Nil
-    }
-
-    def toList(): List[(K, V)] = buffer.flatten.toList
+  def get(key: K): Option[V] = {
+    val pos = Math.floorMod(key.##, capacity)
+    buffer(pos).find(_._1 == key).map(_._2)
   }
+
+  def put(key: K, value: V): Unit = {
+    val pos = Math.floorMod(key.##, capacity)
+    val newList = (key, value) :: buffer(pos).filter(_._1 != key)
+    buffer(pos) = newList
+  }
+
+  def delete(key: K): Unit = {
+    val pos = Math.floorMod(key.##, capacity)
+    buffer(pos) = Nil
+  }
+
+  def toList(): List[(K, V)] = buffer.flatten.toList
+}
 ```
 
 ---
