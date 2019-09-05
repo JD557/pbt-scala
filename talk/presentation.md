@@ -19,6 +19,7 @@ A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu
   - Testing Stateful Systems
     - Unit Tests
     - QuickCheck
+    - Testing Race Condtions
     - Tips
 
 ---
@@ -60,7 +61,7 @@ We want to test a function `f: A => B` that:
 
 Implement `lettersOnly: String => Boolean`
  - Returns `true` if the string contains only letters (`[a-zA-z]`)
- - Returns`false` otherwise
+ - Returns `false` otherwise
 
 ---
 
@@ -156,7 +157,7 @@ How could we avoid this?
 
 ---
 
-#### Arbitrary vs Gen
+##### Arbitrary vs Gen
 
 - QuickCheck contains an extra typeclass `Arbitrary[T](arbitrary: Gen[T])`
 - In ScalaCheck, `Gen`s are explicit while `Arbitrary`s are used in implicit searches.
@@ -169,7 +170,7 @@ The included generators are also biased towards known edge cases (empty strings,
 
 ---
 
-#### Properties
+##### Properties
 
 Our tests are now written as properties (`Prop`) of the form $\forall x \ldotp P(x)$
 
@@ -189,7 +190,7 @@ Properties can be combined (`&&`, `||`, `==>`,...) or tested (`check()`)
 
 ---
 
-#### QuickCheck approach
+##### QuickCheck approach
 
 Our new test suite:
 - Tests known `true` cases
@@ -223,7 +224,7 @@ We should also add a `Shrink[String]` to shrink our examples:
 
 ```scala
 // Shrink our examples by removing one letter from the string
-implicit lazy val shrinkString: Shrink[String] = Shrink { s =>
+implicit val shrinkString: Shrink[String] = Shrink { s =>
   Set(s.drop(1), s.dropRight(1)).filter(_ != s).toStream
 }
 ```
@@ -263,7 +264,7 @@ def lettersOnly(string: String): Boolean = {
 
 ---
 
-#### Shrinking
+##### Shrinking
 
 We implemented our custom `Shrink[String]`, but ScalaCheck already comes with a default implementation.
 
@@ -298,7 +299,7 @@ Result with the default shrinker:
 
 ---
 
-#### Hedgehog implementation
+##### Hedgehog implementation
 
 ```scala
 // Helper function to avoid the hedgehog-runtime boilerplate
@@ -492,7 +493,7 @@ However, again, our code is **WRONG**!
 
 ---
 
-#### QuickCeck Approach
+##### Commands API
 
 We define our `State` and `Sut` and initial states:
 ```scala
@@ -647,18 +648,66 @@ def delete(key: K): Unit = {
 
 ---
 
+#### Testing Race Conditions
+
+- ScalaCheck & co. can also test for race conditions
+- Just configure the following variables:
+  - `threadCount` - commands to run in parallel
+  - `maxParComb` - maximum combinations to test
+- Runs the test in two phases
+  - Sequential phase
+  - Parallel phase
+
+---
+
+- Sequential phase
+  - Runs a sequence of commands
+  - Post-conditions checked after each command
+- Parallel phase
+  - Runs `threadCount` sequences of commands in parallel
+  - Can't check post conditions! (commands might be interleaved)
+    - Calculate "all" (up to `maxParComb`) command interleavings
+    - The test passes if one of the possible `(lastCommand, lastState)` post condition succeeds
+      - There was a interleaving that, if executed sequentially, would reach that state
+
+---
+Toy Example:
+
+```
+
+                                 +-----------+   +--------+                         +--------+
+                              +->|Put("b", 5)+-->|Del("a")+------------------------>|ToList()|
+                              |  +-----------+   +--------+                         +--------+
++-----------+   +--------+    |
+|Put("a", 5)+-->|Get("a")+----+
++-----------+   +--------+    |
+                              |                              +--------+   +--------+
+                              +----------------------------->|Del("b")+-->|ToList()|
+                                                             +--------+   +--------+
+```
+
+- Unique last command / end state pairs:
+  - `ToList()`/`Map()` - PASS
+  - `ToList()`/`Map("b" -> 5)` - FAIL
+
+Test passes
+
+---
+
 #### Tips
 
 - Your model should be a simpler version of your system
 - Give some love to `genCommand`
   - e.g. use `Gen.frequency` to test interesting command sequences
+- Parallel tests are very sensitive to commands with weak post-conditions
+  - e.g. what would happen if all end commands were `Get("unknownKey")`?
 
 ---
 
 ## Regarding ScalaCheck problems
 
 - Shrinking commands is currently not working with scala 2.12 [scalacheck/#468](https://github.com/typelevel/scalacheck/pull/468)
-- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/typelevel/scalacheck/pull/468)
+- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/typelevel/scalacheck/pull/440)
 - ScalaCheck has recently moved to Typelevel
 
 ---
