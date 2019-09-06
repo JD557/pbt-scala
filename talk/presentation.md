@@ -60,7 +60,7 @@ We want to test a function `f: A => B` that:
 ### Example Problem
 
 Implement `lettersOnly: String => Boolean`
- - Returns `true` if the string contains only letters (`[a-zA-z]`)
+ - Returns `true` if the string contains only letters (`[a-zA-Z]`)
  - Returns `false` otherwise
 
 ---
@@ -134,7 +134,7 @@ How could we avoid this?
 
  * Tests only test a small sample of the total input space
  * Ideally, we would like to test the whole input space
-    - $\forall s\in[a \textrm{--} zA\textrm{--}z]^* \ldotp lettersOnly(s)$
+    - $\forall s\in[a \textrm{--} zA\textrm{--}Z]^* \ldotp lettersOnly(s)$
     - $\forall s\in[0 \textrm{--} 9]^+ \ldotp \neg{lettersOnly(s)}$
     - ...
  * Possible Solution: Use random inputs
