@@ -2,7 +2,7 @@
 paginate: true
 ---
 
-# Property Based Tests
+# Property Based Tests in Scala
 
 A [Velocidi](http://velocidi.com) tech talk by [João Costa](http://joaocosta.eu) / [@JD557](https://twitter.com/JD557)
 
@@ -701,14 +701,6 @@ Test passes
   - e.g. use `Gen.frequency` to test interesting command sequences
 - Parallel tests are very sensitive to commands with weak post-conditions
   - e.g. what would happen if all end commands were `Get("unknownKey")`?
-
----
-
-## Regarding ScalaCheck problems
-
-- Shrinking commands is currently not working with scala 2.12 [scalacheck/#468](https://github.com/typelevel/scalacheck/pull/468)
-- Automatic shrinking might be removed when using `Gen` [scalacheck/#440](https://github.com/typelevel/scalacheck/pull/440)
-- ScalaCheck has recently moved to Typelevel
 
 ---
 

@@ -15,7 +15,7 @@ object ScalaCheckCustomShrink extends App {
   // Note:
   //  Gen[T] => Generator for type T
   //  Arbitrary[T] => Wraps a Gen[T] that is used in implicit searches
-  def test(fun: String => Boolean) {
+  def test(fun: String => Boolean): Unit = {
     // Use the included string generators
     forAll(Gen.alphaLowerStr)(str => fun(str) == true).check()
     forAll(Gen.alphaUpperStr)(str => fun(str) == true).check()

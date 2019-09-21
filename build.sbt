@@ -2,22 +2,19 @@ name := "Property Based Testing"
 
 version := "1.0"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.9"
 
 resolvers += Resolver.url("bintray-scala-hedgehog",
     url("https://dl.bintray.com/hedgehogqa/scala-hedgehog")
   )(Resolver.ivyStylePatterns)
 
-val hedgehogVersion = "d74f5bb31f26d3e3b7f7d0198b6e768a1ed20669"
+val hedgehogVersion = "06b22e95ca1a32a2569914824ffe6fc4cfd62c62"
 
 libraryDependencies ++= List(
-  //"org.scalacheck" %% "scalacheck" % "1.14.1-SNAPSHOT", // Applies https://github.com/rickynils/scalacheck/pull/468
-  "org.scalacheck" %% "scalacheck" % "1.14.0",
+  "org.scalacheck" %% "scalacheck" % "1.14.1",
 
   "hedgehog" %% "hedgehog-core" % hedgehogVersion,
   "hedgehog" %% "hedgehog-runner" % hedgehogVersion,
-  "hedgehog" %% "hedgehog-sbt" % hedgehogVersion,
-
-  "org.typelevel" %% "discipline" % "0.11.0"
+  "hedgehog" %% "hedgehog-sbt" % hedgehogVersion
 )
 

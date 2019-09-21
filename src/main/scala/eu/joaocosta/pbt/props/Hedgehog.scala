@@ -7,7 +7,7 @@ import eu.joaocosta.pbt.props.Impls._
 
 object Hedgehog extends App {
 
-  def test(fun: String => Boolean) {
+  def test(fun: String => Boolean): Unit = {
 
     def check(gen: GenT[String], expected: Boolean): Unit = {
       val result = Property.checkRandom(
